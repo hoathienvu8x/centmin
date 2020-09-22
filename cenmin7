@@ -12,4 +12,139 @@ fi
 
 . /tmp/info.tmp
 
-exit
+rm -f /etc/localtime
+ln -sf /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
+
+if [ -s /etc/selinux/config ]; then
+    sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+    sed -i 's/SELINUX=permissive/SELINUX=disabled/g' /etc/selinux/config
+fi
+setenforce 0
+
+# Install EPEL + Remi Repo
+yum -y install epel-release yum-utils
+rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm
+
+if [ "$nginx_version" != "" ];
+then
+    # Install Nginx Repo
+    rpm -Uvh http://nginx.org/packages/centos/7/noarch/RPMS/nginx-release-centos-7-0.el7.ngx.noarch.rpm
+fi
+
+if [ "$mariadb_version" != "" ];
+then
+    cat >/etc/yum.repos.d/MariaDB.repo <<EOF
+# MariaDB $mariadb_version CentOS repository list - created `date +"%Y-%m-%d %H:%M UTC"`
+# http://downloads.mariadb.org/mariadb/repositories/
+[mariadb]
+name = MariaDB
+baseurl = http://yum.mariadb.org/$mariadb_version/centos7-amd64
+gpgkey=https://yum.mariadb.org/RPM-GPG-KEY-MariaDB
+gpgcheck=1
+EOF
+fi
+
+systemctl stop  saslauthd.service
+systemctl disable saslauthd.service
+
+# Disable the FirewallD Service and use Iptables instead because FirewallD need reboot in order to start
+systemctl stop firewalld
+systemctl disable firewalld
+systemctl mask firewalld
+
+yum -y remove mysql* php* httpd* sendmail* postfix* rsyslog*
+yum clean all
+yum -y update
+
+# Enable Remi Repo
+yum-config-manager --enable remi
+if [ "$php_version" != "" ];
+then
+    if [ "$php_version" == "7.0" ];
+    then
+        yum-config-manager --enable remi-php70
+    elif [ "$php_version" == "7.1" ];
+    then
+        yum-config-manager --enable remi-php71
+    elif [ "$php_version" == "7.2" ];
+    then
+        yum-config-manager --enable remi-php72
+    elif [ "$php_version" == "7.3" ];
+    then
+        yum-config-manager --enable remi-php73
+    elif [ "$php_version" == "7.4" ];
+    then
+        yum-config-manager --enable remi-php74
+    fi
+    yum -y install php-fpm php-common php-gd php-mysqlnd php-pdo php-xml php-mbstring php-mcrypt php-curl php-opcache php-cli php-pecl-zip
+fi
+
+if [ "$nginx_version" != "" ];
+then
+    yum -y install nginx
+    cat > "/etc/nginx/nginx.conf" <<END
+user nginx;
+worker_processes auto;
+worker_rlimit_nofile 260000;
+
+error_log  /var/log/nginx/error.log warn;
+pid        /var/run/nginx.pid;
+
+events {
+    worker_connections  2048;
+    accept_mutex off;
+    accept_mutex_delay 200ms;
+    use epoll;
+    #multi_accept on;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    log_format  main  '\$remote_addr - \$remote_user [\$time_local] "\$request" '
+                  '\$status \$body_bytes_sent "\$http_referer" '
+                  '"\$http_user_agent" "\$http_x_forwarded_for"';
+
+    #Disable IFRAME
+    add_header X-Frame-Options SAMEORIGIN;
+
+    #Prevent Cross-site scripting (XSS) attacks
+    add_header X-XSS-Protection "1; mode=block";
+
+    #Prevent MIME-sniffing
+    add_header X-Content-Type-Options nosniff;
+
+    access_log  off;
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay off;
+    types_hash_max_size 2048;
+    server_tokens off;
+    server_names_hash_bucket_size 128;
+    client_max_body_size 0;
+    client_body_buffer_size 256k;
+    client_body_in_file_only off;
+    client_body_timeout 60s;
+    client_header_buffer_size 256k;
+    client_header_timeout  20s;
+    large_client_header_buffers 8 256k;
+    keepalive_timeout 10;
+    keepalive_disable msie6;
+    reset_timedout_connection on;
+    send_timeout 60s;
+
+    gzip on;
+    gzip_static on;
+    gzip_disable "msie6";
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_buffers 16 8k;
+    gzip_http_version 1.1;
+    gzip_types text/plain text/css application/json text/javascript application/javascript text/xml application/xml application/xml+rss;
+
+    include /etc/nginx/conf.d/*.conf;
+}
+END
+fi
