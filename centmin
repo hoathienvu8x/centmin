@@ -1,0 +1,80 @@
+#!/bin/bash
+script_url="https://raw.githubusercontent.com/hoathienvu8x/centmin/master"
+
+cecho () {
+    echo -e "$1"; tput sgr0
+}
+
+if [ $(id -u) != "0" ];
+then
+    cecho "\033[0;31mBạn cần phải có quyền \033[0m\`\033[1;32mroot\033[0m\`\033[0;31m để thao tác.\033[0m"
+    cecho " 1. Chạy lệnh \`\033[0;32msudo su\033[0m\` để chuyển quyền \`\033[1;32mroot\033[0m\` sau đó chạy lệnh \`\033[0;32mbash $0\033[0m\` !"
+    cecho " 2. Chạy lệnh \`\033[0;32msudo bash $0\033[0m\` để chạy dưới quyền \`\033[1;32mroot\033[0m\` !"
+    exit
+fi
+
+if [ ! -f /etc/redhat-release ];
+then
+    cecho "\033[0;31mHệ thống của bạn không phải là \033[0m\`\033[0;32mCentOS\033[0m\`"
+    exit
+fi
+
+if [ -f /etc/centmin/centmin.conf ];
+then
+    cecho "Máy chủ của bạn đã cài đặt sẵn \`\033[1;32mcentmin\033[0m\`"
+    cecho " Chạy lênh \`\033[0;32mcentmin\033[0m\` để sử dụng"
+    exit
+fi
+
+if [ ! -f /usr/bin/wget ];
+then
+    cecho "Cài đặt \`\033[1;33mwget\033[0m\`"
+    yum -y -q install wget
+fi
+
+if [ ! -f /usr/bin/unzip ];
+then
+    cecho "Cài đặt \`\033[1;33munzip\033[0m\`"
+    yum -y -q install unzip
+fi
+
+if [ ! -f /usr/bin/gawk ];
+then
+    cecho "Cài đặt \`\033[1;33mgawk\033[0m\`"
+    yum -y -q install gawk
+fi
+
+if [ ! -f /usr/bin/lsof ];
+then
+    cecho "Cài đặt \`\033[1;33mlsof\033[0m\`"
+    yum -y -q install lsof
+fi
+
+if [ -f /var/cpanel/cpanel.config ];
+then
+    cecho "Máy chủ của bạn đã cài đặt \`\033[1;32mWHM/Cpanel\033[0m\`"
+    cecho "\033[0;31mCài đặt đã huỷ !\033[0m"
+    exit
+fi
+
+if [ -f /etc/psa/.psa.shadow ];
+then
+    cecho "Máy chủ của bạn đã cài đặt \`\033[1;32mPlesk\033[0m\`"
+    cecho "\033[0;31mCài đặt đã huỷ !\033[0m"
+    exit
+fi
+
+if [ -f /etc/init.d/directadmin ];
+then
+    cecho "Máy chủ của bạn đã cài đặt \`\033[1;32mDirectAdmin\033[0m\`"
+    cecho "\033[0;31mCài đặt đã huỷ !\033[0m"
+    exit
+fi
+
+centos_ver=$(cat /etc/redhat-release | grep -o '[0-9]\.[0-9]')
+
+cd /tmp/
+
+cecho "Cài đặt \`\033[1;32mcentmin\033[0m\` cho máy chủ \`\033[1;32mCentOS $centos_ver\033[0m\`"
+
+curl -s "$script_url/centmin$centos_ver" -o install && bash install
