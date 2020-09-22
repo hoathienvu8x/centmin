@@ -84,28 +84,28 @@ server_swap_mb=`echo "scale=0;$server_swap_total/1024" | bc`
 server_ip=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
 
 cecho "Thông tin máy chủ của bạn"
-cecho "Loại CPU\t\t: `echo $cpu_name | sed 's/ *$//g'` (x$cpu_cores) Freq $cpu_freq MHz"
+cecho "          Loại CPU : `echo $cpu_name | sed 's/ *$//g'` (x$cpu_cores) Freq $cpu_freq MHz"
 if [ $server_ram_mb -gt 1024 ];
 then
     server_ram_gb=`echo "scale=0;$server_ram_mb/1024" | bc`
-    cecho "Dung lượng RAM\t: \033[0;32m${server_ram_gb}GB\033[0m"
+    cecho "    Dung lượng RAM : \033[0;32m${server_ram_gb}GB\033[0m"
 else
     if [ $server_ram_total -lt $low_ram ];
     then
-        cecho "Dung lượng RAM\t: \033[0;31m${server_ram_mb}MB (x)\033[0m"
+        cecho "    Dung lượng RAM : \033[0;31m${server_ram_mb}MB (x)\033[0m"
     else
-        cecho "Dung lượng RAM\t: \033[0;32m${server_ram_mb}MB\033[0m"
+        cecho "    Dung lượng RAM : \033[0;32m${server_ram_mb}MB\033[0m"
     fi
 fi
 if [ $server_swap_mb -gt 1024 ];
 then
     server_swap_gb=`echo "scale=0;$server_swap_mb/1024" | bc`
-    cecho "Dung lượng Swap\t: ${server_swap_gb}GB"
+    cecho "   Dung lượng Swap : ${server_swap_gb}GB"
 else
-    cecho "Dung lượng Swap\t: ${server_swap_mb}MB"
+    cecho "   Dung lượng Swap : ${server_swap_mb}MB"
 fi
-cecho "Dung lượng ổ cứng\t: ${server_hdd}B"
-cecho "Địa chỉ IP\t: $server_ip"
+cecho " Dung lượng ổ cứng : ${server_hdd}B"
+cecho "        Địa chỉ IP : $server_ip"
 
 if [ $server_ram_total -lt $low_ram ];
 then
@@ -115,24 +115,145 @@ then
 fi
 cd /tmp/
 
+prompt=""
 php_version=""
 # Kiểm tra có cài đặt PHP không ?
+read -p "Bạn có muốn cài PHP không [Y/N]? " prompt
+if [[ "$prompt" == [yY] ]];
+then
+    php_versions=("7.0" "7.1" "7.2" "7.3" "7.4")
+    all_versions=$(printf ", \033[1;32m%s\033[0m" "${php_versions[@]}")
+    prompt=""
+    while [[ ! $prompt =~ ^[0-9].[0-9]$ ]];
+    do
+        read -p "Chọn phiên bản PHP [ ${all_versions:2} ]: " prompt
+        for v in "${php_versions[@]}"
+        do
+            if [ "$v" == "$prompt" ];
+            then
+                php_version="$v"
+            fi
+        done
+        if [[ "$php_version" == "" ]];
+        then
+            prompt=""
+        fi
+    done
+fi
 mariadb_version=""
+prompt=""
+read -p "Bạn có muốn cài Mariadb không [Y/N]? " prompt
+if [[ "$prompt" == [yY] ]];
+then
+    mariadb_versions=("10.1" "10.2" "10.3" "10.4")
+    all_versions=$(printf ", \033[1;32m%s\033[0m" "${mariadb_versions[@]}")
+    prompt=""
+    while [[ ! $prompt =~ ^[0-9]+.[0-9]$ ]];
+    do
+        read -p "Chọn phiên bản MariaDB [ ${all_versions:2} ]: " prompt
+        for v in "${mariadb_versions[@]}"
+        do
+            if [ "$v" == "$prompt" ];
+            then
+                mariadb_version="$v"
+            fi
+        done
+        if [[ "$mariadb_version" == "" ]];
+        then
+            prompt=""
+        fi
+    done
+fi
 # Kiểm tra có cài đặt Mariadb không ?
 nginx_version=""
+prompt=""
+read -p "Bạn có muốn cài Nginx không [Y/N]? " prompt
+if [[ "$prompt" == [yY] ]];
+then
+    nginx_version="latest"
+fi
 # Kiểm tra có cài đặt NGINX không ?
 golang_version=""
+prompt=""
+read -p "Bạn có muốn cài Golang không [Y/N]? " prompt
+if [[ "$prompt" == [yY] ]];
+then
+    golang_versions=("1.1" "1.2" "1.3" "1.7" "1.8" "1.14" "1.15")
+    all_versions=$(printf ", \033[1;32m%s\033[0m" "${golang_versions[@]}")
+    prompt=""
+    while [[ ! $prompt =~ ^[0-9]+.[0-9]+$ ]];
+    do
+        read -p "Chọn phiên bản Golang [ ${all_versions:2} ]: " prompt
+        for v in "${golang_versions[@]}"
+        do
+            if [ "$v" == "$prompt" ];
+            then
+                golang_version="$v"
+            fi
+        done
+        if [[ "$golang_version" == "" ]];
+        then
+            prompt=""
+        fi
+    done
+fi
 # Kiểm tra có cài đặt Golang không ?
 domain_name=""
+prompt=""
+while [[ ! $prompt =~ ^([a-zA-Z0-9](([a-zA-Z0-9-]){0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]];
+do
+    read -p "Nhập vào một tên miền hợp lệ: " prompt
+    prompt="${prompt#http://}"
+    prompt="${prompt#https://}"
+    prompt="${prompt#ftp://}"
+    prompt="${prompt#scp://}"
+    prompt="${prompt#sftp://}"
+    prompt="${prompt/www./''}"
+    prompt="${prompt%%/*}"
+    if [ "${#prompt}" -lt 4 ] || [ "${#prompt}" -gt 253 ];
+    then
+        prompt=""
+    fi
+    prompt=$(echo $prompt | grep -P "^([a-zA-Z0-9](([a-zA-Z0-9-]){0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$")
+    if [[ $prompt != "" ]];
+    then
+        domain_name="$prompt"
+    fi
+done
 # Kiểm tra tên miền chính ?
-cat > info.tmp <<EOF
+cat > /tmp/info.tmp <<EOF
 #!/bin/bash
-php_version=$php_version
-mariadb_version=$mariadb_version
-nginx_version=$nginx_version
-golang_version=$golang_version
-domain_name=$domain_name
+php_version="$php_version"
+mariadb_version="$mariadb_version"
+nginx_version="$nginx_version"
+golang_version="$golang_version"
+domain_name="$domain_name"
 EOF
+cecho "Thông tin sẽ cài đặt cho máy chủ của bạn"
+if [ "$php_version" != "" ];
+then
+    cecho "      PHP : \033[1;32m$php_version\033[0m"
+fi
+if [ "$mariadb_version" != "" ];
+then
+    cecho "  Mariadb : \033[1;32m$mariadb_version\033[0m"
+fi
+if [ "$nginx_version" != "" ];
+then
+    cecho "    Nginx : \033[1;32m$nginx_version\033[0m"
+fi
+if [ "$golang_version" != "" ];
+then
+    cecho "   Golang : \033[1;32m$golang_version\033[0m"
+fi
+cecho " Tên miền : \033[1;32m$domain_name\033[0m"
+
+
+if [ "$php_version$mariadb_version$nginx_version$golang_version$domain_name" == "" ];
+then
+    cecho "\033[0;31mKhông có gì để cài đặt\033[0m"
+    exit
+fi
 cecho "Cài đặt \`\033[1;32mcentmin\033[0m\` cho máy chủ \`\033[1;32mCentOS $centos_ver\033[0m\`"
 
 curl -s "$script_url/centmin$centos_ver" -o install && bash install

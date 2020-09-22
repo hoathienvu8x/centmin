@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cecho () {
+    echo -e "$1"; tput sgr0
+}
+
+if [ ! -f /tmp/info.tmp ];
+then
+    cecho "\033[0;31mKhông tìm thấy tập tin cấu hình cài đặt\033[0m"
+    exit
+fi
+
+. /tmp/info.tmp
+
+exit
