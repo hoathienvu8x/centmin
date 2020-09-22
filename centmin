@@ -72,9 +72,67 @@ then
 fi
 
 centos_ver=$(cat /etc/redhat-release | grep -o '[0-9]\.[0-9]')
+low_ram='262144' # 256MB
+cpu_name=$( awk -F: '/model name/ {name=$2} END {print name}' /proc/cpuinfo )
+cpu_cores=$( awk -F: '/model name/ {core++} END {print core}' /proc/cpuinfo )
+cpu_freq=$( awk -F: ' /cpu MHz/ {freq=$2} END {print freq}' /proc/cpuinfo )
+server_ram_total=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+server_ram_mb=`echo "scale=0;$server_ram_total/1024" | bc`
+server_hdd=$( df -h | awk 'NR==2 {print $2}' )
+server_swap_total=$(awk '/SwapTotal/ {print $2}' /proc/meminfo)
+server_swap_mb=`echo "scale=0;$server_swap_total/1024" | bc`
+server_ip=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
 
+cecho "Thông tin máy chủ của bạn"
+cecho "Loại CPU\t\t: `echo $cpu_name | sed 's/ *$//g'` (x$cpu_cores) Freq $cpu_freq MHz"
+if [ $server_ram_mb -gt 1024 ];
+then
+    server_ram_gb=`echo "scale=0;$server_ram_mb/1024" | bc`
+    cecho "Dung lượng RAM\t: \033[0;32m${server_ram_gb}GB\033[0m"
+else
+    if [ $server_ram_total -lt $low_ram ];
+    then
+        cecho "Dung lượng RAM\t: \033[0;31m${server_ram_mb}MB (x)\033[0m"
+    else
+        cecho "Dung lượng RAM\t: \033[0;32m${server_ram_mb}MB\033[0m"
+    fi
+fi
+if [ $server_swap_mb -gt 1024 ];
+then
+    server_swap_gb=`echo "scale=0;$server_swap_mb/1024" | bc`
+    cecho "Dung lượng Swap\t: ${server_swap_gb}GB"
+else
+    cecho "Dung lượng Swap\t: ${server_swap_mb}MB"
+fi
+cecho "Dung lượng ổ cứng\t: ${server_hdd}B"
+cecho "Địa chỉ IP\t: $server_ip"
+
+if [ $server_ram_total -lt $low_ram ];
+then
+    cecho "\033[0;31mRAM ${server_ram_mb}MB qúa nhỏ để cài đặt, yêu cầu tối thiểu `echo "scale=0;$low_ram/1024" | bc`MB\033[0m"
+    cecho "\033[0;31mCài đặt đã huỷ !\033[0m"
+    exit
+fi
 cd /tmp/
 
+php_version=""
+# Kiểm tra có cài đặt PHP không ?
+mariadb_version=""
+# Kiểm tra có cài đặt Mariadb không ?
+nginx_version=""
+# Kiểm tra có cài đặt NGINX không ?
+golang_version=""
+# Kiểm tra có cài đặt Golang không ?
+domain_name=""
+# Kiểm tra tên miền chính ?
+cat > info.tmp <<EOF
+#!/bin/bash
+php_version=$php_version
+mariadb_version=$mariadb_version
+nginx_version=$nginx_version
+golang_version=$golang_version
+domain_name=$domain_name
+EOF
 cecho "Cài đặt \`\033[1;32mcentmin\033[0m\` cho máy chủ \`\033[1;32mCentOS $centos_ver\033[0m\`"
 
 curl -s "$script_url/centmin$centos_ver" -o install && bash install
